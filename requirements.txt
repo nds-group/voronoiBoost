@@ -1,0 +1,5 @@
+numpy==1.22.3
+pandas==1.2.3
+pickleshare==0.7.5
+scipy==1.8.1
+Shapely==1.7.1
