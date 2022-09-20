@@ -24,12 +24,22 @@ pip install -r requirements.txt
 ```
 
 ## Usage
-To load the model and predict the VoronoiBoost you can use the following code:
+First is need it to join the model files:
+
+```bash
+cat model/xa* > model/voronoiBoost.sav.xz
+```
+
+then to load the model and predict the optimal scaling factor with VoronoiBoost you can use the following code:
+
 
 ```python
 import pickle
+import lzma
 
-filename = f'./model/voronoiBoost.sav'
-model = pickle.load(open(filename, 'rb'))
+filename = f'./model/voronoiBoost.sav.xz'
+with lzma.open(filename, 'rb') as f:
+    model = pickle.load(f)
+
 model
 ```
