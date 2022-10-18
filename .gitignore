@@ -1,1 +1,2 @@
-model/*.sav.xz
+ignore
+VoronoiBoost_Test.ipynb
