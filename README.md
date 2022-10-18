@@ -24,22 +24,37 @@ pip install -r requirements.txt
 ```
 
 ## Usage
-First is need it to join the model files:
-
-```bash
-cat model/xa* > model/voronoiBoost.sav.xz
-```
-
-then to load the model and predict the optimal scaling factor with VoronoiBoost you can use the following code:
-
+First is need to import the VoronoiBoost class from the voronoiBoost.py file:
 
 ```python
-import pickle
-import lzma
+import pandas as pd
 
-filename = f'./model/voronoiBoost.sav.xz'
-with lzma.open(filename, 'rb') as f:
-    model = pickle.load(f)
+from shapely.geometry import shape as Shape
+from shapely.geometry import Polygon
 
-model
+from voronoiBoost import VoronoiBoost
 ```
+
+**VoronoiBoost** use the same input as a standard voronoi tesselation, 
+* set of points (base stations) 
+* a border area that defines the area of interest
+
+then, and instance can be lunch by provinding also the path to the trained model file.
+
+```python
+voronoiBoost = VoronoiBoost(sites, city_shape, model_path)
+
+df_bs = voronoiBoost.compute_voronoiBoost()
+df_bs.head(2)
+```
+
+The output is a pandas dataframe with the following columns:
+``lon``, ``lat``, ``voronoi`` & ``voronois_scaled_overlap``
+
+where ``voronoi`` is the voronoi cell associated to the base station and ``voronois_scaled_overlap`` is the scaled voronoi cell.
+
+The following images show the legacy voronoi decomposition and the voronoiBoost decomposition for the same base stations. Other base stations are hidden for clarity.
+
+| Legacy tessallation | VoronoiBoost |
+| ------------------- | ------------ |
+| ![alt text](images/legacy_voronoi.png)  | ![alt text](images/voronoiBoost.png) 
