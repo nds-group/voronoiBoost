@@ -57,4 +57,4 @@ The following images show the legacy voronoi decomposition and the voronoiBoost 
 
 | Legacy tessallation | VoronoiBoost |
 | ------------------- | ------------ |
-| ![alt text](images/legacy_voronoi.png)  | ![alt text](images/voronoiBoost.png) 
+| ![alt text](images/Voronoi_Orange_Paris_same_color.png)  | ![alt text](images/VoronoiBoost_Orange_Paris_same_color.png) 

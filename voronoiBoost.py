@@ -17,8 +17,8 @@ import mapply
 import lzma
 
 mapply.init(
-    n_workers=20,
-    chunk_size=1,
+    n_workers=40,
+    chunk_size=20,
     progressbar=False
 )
 
@@ -48,8 +48,8 @@ class VoronoiBoost:
         self.sites = np.array(sites)
         self.n = len(sites)
         self.ids = list(range(len(sites)))
-        self.lons = [site[0] for site in sites]
-        self.lats = [site[1] for site in sites]
+        self.lats = [site[0] for site in sites]
+        self.lons = [site[1] for site in sites]
         self.model_path = model_path
 
         self.df_bs = pd.DataFrame(data={
@@ -84,7 +84,6 @@ class VoronoiBoost:
         fd = lzma.open(self.model_path, 'rb')
         self.model = pickle.load(fd)
         fd.close()
-        print('Model loaded 🤩.')
         return self.model
 
     def compute_voronoi_tessellation(self):
@@ -105,12 +104,12 @@ class VoronoiBoost:
             voronois[pts_index] = region_polys[voronoi_index]
 
         # if multiple polygons are returned, keep only the one that contains the BS
-        for index, (lon, lat, voronoi) in enumerate(zip(self.lons, self.lats, voronois)):
+        for index, (lat, lon, voronoi) in enumerate(zip(self.lats, self.lons, voronois)):
             if voronoi.type == 'Polygon':
                 continue
             # else is a MultiPolygon
             for polygon in voronoi:
-                if Point(lon, lat).within(polygon):
+                if Point(lat, lon).within(polygon):
                     voronois[index] = polygon
 
         self.df_bs['voronoi'] = voronois
@@ -166,6 +165,15 @@ class VoronoiBoost:
         neighbors_level = list(nx.single_source_shortest_path_length(self.g_delaunay, node_id, cutoff=level).keys())
         neighbors_level_exclusive = set(neighbors_level) - set(neighbors_level_down)
 
+        if len(neighbors_level_exclusive) == 0:
+
+            if len(neighbors_level) == self.n:
+                min_distance, mean_distance = self.get_average_d_neighbors(node_id, level-1)
+                return min_distance, mean_distance
+            else:
+                min_distance, mean_distance = self.get_average_d_neighbors(node_id, level+1)
+                return min_distance, mean_distance
+
         site = self.sites[node_id]
         distances = []
         for node_id_neighbor in neighbors_level_exclusive:
@@ -185,19 +193,25 @@ class VoronoiBoost:
         # set of exclusive neighbors in level i
         neighbors_level_exclusive = set(neighbors_level) - set(neighbors_level_down)
 
-        if len(neighbors_level_exclusive) == 1:
-            return None, None, None
+        # if in this level the number of neighboords dont allow to compute the feature, go to the next level
+        if len(neighbors_level_exclusive) < 2:
+            if len(neighbors_level) == self.n:
+                mean_distance = self.get_distance_between_neighbors_level(node_id, level-1)
+                return mean_distance
+            else:
+                mean_distance = self.get_distance_between_neighbors_level(node_id, level+1)
+                return mean_distance
 
         # set of all possible pairs of neighbors
         neighbors_level_pairs = list(itertools.combinations(neighbors_level_exclusive, 2))
-        
+
         distances = []
         for node_id_1, node_id_2 in neighbors_level_pairs:
             site_1 = self.sites[node_id_1]
-            if node_id_2 in set(self.g_delaunay.neighbors(node_id_1)): # if node_id_2 is neighbor of node_id_1 and viceversa
-                site_2 = self.sites[node_id_2]
-                distance = earth_distance(site_1, site_2)
-                distances.append(distance)
+            # if node_id_2 in set(self.g_delaunay.neighbors(node_id_1)): # if node_id_2 is neighbor of node_id_1 and viceversa
+            site_2 = self.sites[node_id_2]
+            distance = earth_distance(site_1, site_2)
+            distances.append(distance)
 
         if len(distances) == 0:
             raise Exception('No pair of neighbors in level i 😨')
@@ -212,8 +226,8 @@ class VoronoiBoost:
 
         bs = self.df_bs[self.df_bs['id'] == node_id].iloc[0]
         voronoi = bs['voronoi']        
-        voronoi_lons, voronoi_lats = voronoi.exterior.coords.xy
-        vertexs = list(zip(voronoi_lons, voronoi_lats))
+        voronoi_lats, voronoi_lons = voronoi.exterior.coords.xy
+        vertexs = list(zip(voronoi_lats, voronoi_lons))
 
         distances = [earth_distance(site, vertex) for vertex in vertexs]
     
@@ -228,10 +242,10 @@ class VoronoiBoost:
         voronoi = bs['voronoi']        
         
         minimum_rotated_rectangle = voronoi.minimum_rotated_rectangle
-        lons, lats = minimum_rotated_rectangle.exterior.coords.xy
+        lats, lons = minimum_rotated_rectangle.exterior.coords.xy
 
-        side_1 = earth_distance((lons[0], lats[0]), (lons[1], lats[1]))
-        side_2 = earth_distance((lons[1], lats[1]), (lons[2], lats[2]))
+        side_1 = earth_distance((lats[0], lons[0]), (lats[1], lons[1]))
+        side_2 = earth_distance((lats[1], lons[1]), (lats[2], lons[2]))
         
         voronoi_diameter = max([side_1, side_2]) # diameter
         voronoi_width = min([side_1, side_2]) # width
@@ -240,7 +254,7 @@ class VoronoiBoost:
 
 
     def get_average_area_neighbors(self, node_id, level):
-        # TODO: train model with lonlat area
+        # TODO: train model with latlon area
         neighbors_level = list(nx.single_source_shortest_path_length(self.g_delaunay, node_id, cutoff=level).keys())
 
         voronoi_areas = []
@@ -260,8 +274,10 @@ class VoronoiBoost:
         for node_id_neighbor in neighbors_level:
             points.append(self.sites[node_id_neighbor])
 
+        # if in this level the number of neighboords dont allow to compute the feature, go to the next level
         if len(points) < 3:
-            return None
+            hull_width = self.get_convex_hull_area_perimeter_diameter_width(node_id, level+1)
+            return hull_width
 
         hull = ConvexHull(points)
         hull = MultiPoint(hull.points).convex_hull
@@ -269,8 +285,8 @@ class VoronoiBoost:
         minimum_rotated_rectangle = hull.minimum_rotated_rectangle
         lons, lats = minimum_rotated_rectangle.exterior.coords.xy
 
-        side_1 = earth_distance((lons[0], lats[0]), (lons[1], lats[1]))
-        side_2 = earth_distance((lons[1], lats[1]), (lons[2], lats[2]))
+        side_1 = earth_distance((lats[0], lons[0]), (lats[1], lons[1]))
+        side_2 = earth_distance((lats[1], lons[1]), (lats[2], lons[2]))
         
         hull_diameter = max([side_1, side_2]) # diameter
         hull_width = min([side_1, side_2]) # width
@@ -297,34 +313,34 @@ class VoronoiBoost:
 
     def get_features(self):
         print('Computing features 🤖...')
-        self.df_bs[['min_d_neighbors_1', 'mean_d_neighbors_1']] = self.df_bs.apply(lambda row: self.get_average_d_neighbors(row['id'], 1), axis=1, result_type='expand')
-        self.df_bs[['min_d_neighbors_6', 'mean_d_neighbors_6']] = self.df_bs.apply(lambda row: self.get_average_d_neighbors(row['id'], 6), axis=1, result_type='expand')
-        self.df_bs[['min_d_neighbors_8', 'mean_d_neighbors_8']] = self.df_bs.apply(lambda row: self.get_average_d_neighbors(row['id'], 8), axis=1, result_type='expand')
-        self.df_bs[['min_d_neighbors_10', 'mean_d_neighbors_10']] = self.df_bs.apply(lambda row: self.get_average_d_neighbors(row['id'], 10), axis=1, result_type='expand')
+        self.df_bs[['min_d_neighbors_1', 'mean_d_neighbors_1']] = self.df_bs.mapply(lambda row: self.get_average_d_neighbors(row['id'], 1), axis=1, result_type='expand')
+        self.df_bs[['min_d_neighbors_6', 'mean_d_neighbors_6']] = self.df_bs.mapply(lambda row: self.get_average_d_neighbors(row['id'], 6), axis=1, result_type='expand')
+        self.df_bs[['min_d_neighbors_8', 'mean_d_neighbors_8']] = self.df_bs.mapply(lambda row: self.get_average_d_neighbors(row['id'], 8), axis=1, result_type='expand')
+        self.df_bs[['min_d_neighbors_10', 'mean_d_neighbors_10']] = self.df_bs.mapply(lambda row: self.get_average_d_neighbors(row['id'], 10), axis=1, result_type='expand')
         
         self.df_bs['mean_d_neighbors_6_1_div'] = self.df_bs['mean_d_neighbors_6']/self.df_bs['mean_d_neighbors_1']
         self.df_bs['mean_d_neighbors_8_1_div'] = self.df_bs['mean_d_neighbors_8']/self.df_bs['mean_d_neighbors_1']
         self.df_bs['mean_d_neighbors_10_1_div'] = self.df_bs['mean_d_neighbors_10']/self.df_bs['mean_d_neighbors_1']
 
-        self.df_bs['mean_distance_1'] = self.df_bs.apply(lambda row: self.get_distance_between_neighbors_level(row['id'], 1), axis=1)
-        self.df_bs['mean_distance_6'] = self.df_bs.apply(lambda row: self.get_distance_between_neighbors_level(row['id'], 6), axis=1)
-        self.df_bs['mean_distance_8'] = self.df_bs.apply(lambda row: self.get_distance_between_neighbors_level(row['id'], 8), axis=1)
-        self.df_bs['mean_distance_10'] = self.df_bs.apply(lambda row: self.get_distance_between_neighbors_level(row['id'], 10), axis=1)
+        self.df_bs['mean_distance_1'] = self.df_bs.mapply(lambda row: self.get_distance_between_neighbors_level(row['id'], 1), axis=1)
+        self.df_bs['mean_distance_6'] = self.df_bs.mapply(lambda row: self.get_distance_between_neighbors_level(row['id'], 6), axis=1)
+        self.df_bs['mean_distance_8'] = self.df_bs.mapply(lambda row: self.get_distance_between_neighbors_level(row['id'], 8), axis=1)
+        self.df_bs['mean_distance_10'] = self.df_bs.mapply(lambda row: self.get_distance_between_neighbors_level(row['id'], 10), axis=1)
         
         self.df_bs['mean_distance_6_1_div'] = self.df_bs['mean_distance_6']/self.df_bs['mean_distance_1']
         self.df_bs['mean_distance_8_1_div'] = self.df_bs['mean_distance_8']/self.df_bs['mean_distance_1']
         self.df_bs['mean_distance_10_1_div'] = self.df_bs['mean_distance_10']/self.df_bs['mean_distance_1']
 
-        self.df_bs['d_v_max'] = self.df_bs.apply(lambda row: self.get_d_vk(row['id']), axis=1)
+        self.df_bs['d_v_max'] = self.df_bs.mapply(lambda row: self.get_d_vk(row['id']), axis=1)
 
-        self.df_bs[['v_diameter', 'v_width']] = self.df_bs.apply(lambda row: self.get_voronoi_diameter_width(row['id']), axis=1, result_type='expand')
-        self.df_bs['v_diameter_v_width_div'] = self.df_bs.apply(lambda row: row['v_diameter']/row['v_width'], axis=1)
+        self.df_bs[['v_diameter', 'v_width']] = self.df_bs.mapply(lambda row: self.get_voronoi_diameter_width(row['id']), axis=1, result_type='expand')
+        self.df_bs['v_diameter_v_width_div'] = self.df_bs.mapply(lambda row: row['v_diameter']/row['v_width'], axis=1)
 
 
-        self.df_bs['mean_area_neighbors_1'] = self.df_bs.apply(lambda row: self.get_average_area_neighbors(row['id'], 1), axis=1)
-        self.df_bs['mean_area_neighbors_4'] = self.df_bs.apply(lambda row: self.get_average_area_neighbors(row['id'], 4), axis=1)
-        self.df_bs['mean_area_neighbors_6'] = self.df_bs.apply(lambda row: self.get_average_area_neighbors(row['id'], 6), axis=1)
-        self.df_bs['mean_area_neighbors_8'] = self.df_bs.apply(lambda row: self.get_average_area_neighbors(row['id'], 8), axis=1)
+        self.df_bs['mean_area_neighbors_1'] = self.df_bs.mapply(lambda row: self.get_average_area_neighbors(row['id'], 1), axis=1)
+        self.df_bs['mean_area_neighbors_4'] = self.df_bs.mapply(lambda row: self.get_average_area_neighbors(row['id'], 4), axis=1)
+        self.df_bs['mean_area_neighbors_6'] = self.df_bs.mapply(lambda row: self.get_average_area_neighbors(row['id'], 6), axis=1)
+        self.df_bs['mean_area_neighbors_8'] = self.df_bs.mapply(lambda row: self.get_average_area_neighbors(row['id'], 8), axis=1)
 
 
         self.df_bs['mean_area_neighbors_4_1_div'] = self.df_bs['mean_area_neighbors_4'] / self.df_bs['mean_area_neighbors_1']
@@ -332,13 +348,13 @@ class VoronoiBoost:
         self.df_bs['mean_area_neighbors_8_1_div'] = self.df_bs['mean_area_neighbors_8'] / self.df_bs['mean_area_neighbors_1']
 
 
-        self.df_bs['convex_hull_width_1'] = self.df_bs.apply(lambda row: self.get_convex_hull_area_perimeter_diameter_width(row['id'], 1), axis=1)
-        self.df_bs['convex_hull_width_8'] = self.df_bs.apply(lambda row: self.get_convex_hull_area_perimeter_diameter_width(row['id'], 8), axis=1)
+        self.df_bs['convex_hull_width_1'] = self.df_bs.mapply(lambda row: self.get_convex_hull_area_perimeter_diameter_width(row['id'], 1), axis=1)
+        self.df_bs['convex_hull_width_8'] = self.df_bs.mapply(lambda row: self.get_convex_hull_area_perimeter_diameter_width(row['id'], 8), axis=1)
         self.df_bs['convex_hull_width_8_1_div'] = self.df_bs['convex_hull_width_8']/self.df_bs[f'convex_hull_width_1']
 
 
-        self.df_bs['mean_d_t_barc_v_1'] = self.df_bs.apply(lambda row: self.get_average_d_t_barc_v(row['id'], 1), axis=1)
-        self.df_bs['mean_d_t_barc_v_10'] = self.df_bs.apply(lambda row: self.get_average_d_t_barc_v(row['id'], 10), axis=1)
+        self.df_bs['mean_d_t_barc_v_1'] = self.df_bs.mapply(lambda row: self.get_average_d_t_barc_v(row['id'], 1), axis=1)
+        self.df_bs['mean_d_t_barc_v_10'] = self.df_bs.mapply(lambda row: self.get_average_d_t_barc_v(row['id'], 10), axis=1)
         self.df_bs['mean_d_t_barc_v_10_1_div'] = self.df_bs['mean_d_t_barc_v_10']/self.df_bs['mean_d_t_barc_v_1']
 
 
@@ -347,7 +363,7 @@ class VoronoiBoost:
         return self.df_bs
 
     def get_prediction(self):
-
+        print('Predicting 🤖...')
         for tau in self.taus:
             tau_column = f'tau_{tau}'
             self.df_bs[tau_column] = tau
@@ -386,7 +402,7 @@ class VoronoiBoost:
     def get_corrected_scales(self):
         print('Correcting scales ➕...')
 
-        self.df_bs[['taus_scales', 'all_taus']] = self.df_bs.apply(lambda row: self._get_correct_scales(row), 
+        self.df_bs[['taus_scales', 'all_taus']] = self.df_bs.mapply(lambda row: self._get_correct_scales(row), 
                                                         axis=1, 
                                                         result_type='expand')
 
@@ -397,28 +413,20 @@ class VoronoiBoost:
     def _get_voronois_overlap(self, row):
         voronoi = row['voronoi']
         taus_scales = row['taus_scales']
+        taus = [tau_scale[0] for tau_scale in taus_scales]
+
         voronois_scaled = []
         for tau, scale in taus_scales:
             voronoi_scaled = affinity.scale(voronoi, scale, scale)
             voronois_scaled.append(voronoi_scaled)
 
-        voronois_scaled_overlap = [voronois_scaled[0]]
-
-        for index in range(len(voronois_scaled)-1):
-            voronoi_small = voronois_scaled[index]
-            voronoi_big = voronois_scaled[index+1]
-            voronoi_scaled_difference = voronoi_big.difference(voronoi_small)
-            voronois_scaled_overlap.append(voronoi_scaled_difference)
-
-        taus = [tau_scale[0] for tau_scale in taus_scales]
-
-        return list(zip(voronois_scaled_overlap, taus))
+        return list(zip(voronois_scaled, taus))
 
 
     def get_voronois_overlap(self):
         print('Computing Voronois overlap 🤓...')
         
-        self.df_bs['voronois_scaled_overlap'] = self.df_bs.apply(lambda row: self._get_voronois_overlap(row), axis=1)
+        self.df_bs['voronoi_boost'] = self.df_bs.mapply(lambda row: self._get_voronois_overlap(row), axis=1)
         
         print('Voronois overlap computed ✅.')
         return self.df_bs
@@ -435,7 +443,7 @@ class VoronoiBoost:
         self.get_corrected_scales()
         self.get_voronois_overlap()
 
-        self.df_bs = self.df_bs[['id', 'lon', 'lat', 'voronoi', 'voronois_scaled_overlap']].copy()
+        self.df_bs = self.df_bs[['id', 'lat', 'lon', 'voronoi', 'voronoi_boost']].copy()
 
         print('VoronoiBoost computed ✅.')
         return self.df_bs
