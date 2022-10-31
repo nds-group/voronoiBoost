@@ -4,8 +4,14 @@
 users associated to each base station. 
 *VoronoiBoost* relies on the same input as traditional Voronoi decompositions, but provides a richer and more accurate rendering of where users are located.
 
-For more details please refer to our paper 'VoronoiBoost: Data-driven Probabilistic Spatial Mapping of Mobile Network Metadata' 
-waiting for publication on Secon 2022 Conference proceeding (https://secon2022.ieee-secon.org/program/)
+For more details, please refer to our paper '[VoronoiBoost: Data-driven Probabilistic Spatial Mapping of Mobile Network Metadata](https://ieeexplore.ieee.org/document/9918610)' published in IEEE Communications Society Conference on Sensor and Ad Hoc Communications and Networks (SECON) 2022 Conference proceeding.
+
+Also, We present a large-scale data set of wireless network coverage for over 22,000 4G base stations in France. The data covers ten main metropolitan areas in the country, encompassing a variety of dense urban, suburban and rural areas. The coverage information in each area is reported separately for the four major mobile network operators active in France.
+For each base station in the data set, coverage is represented as a set of polygonal shapefiles, each associated with a given probability that end terminals associated to the base station are located within the polygon.
+The data set substantially improves current practices for cellular coverage representation in large-scale studies, which primarily rely on plain Voronoi tessellations of the geographical space.
+As such, the data set can support data-driven networking research where coverage overlap or interference are key factors, as well as multidisciplinary investigations based on network metadata that needs to be mapped on the territory.
+
+The dataset is available in the [coverage-in-the-wild](https://github.com/nds-group/voronoiBoost/tree/main/coverage-in-the-wild) folder.
 
 
 | Ground Truth                             | Voronoi                                    | VoronoiBoost                             |
