@@ -10,8 +10,7 @@ Also, We present a large-scale data set of wireless network coverage for over 22
 For each base station in the data set, coverage is represented as a set of polygonal shapefiles, each associated with a given probability that end terminals associated to the base station are located within the polygon.
 The data set substantially improves current practices for cellular coverage representation in large-scale studies, which primarily rely on plain Voronoi tessellations of the geographical space.
 As such, the data set can support data-driven networking research where coverage overlap or interference are key factors, as well as multidisciplinary investigations based on network metadata that needs to be mapped on the territory.
-
-The dataset is available in the [coverage-in-the-wild](https://github.com/nds-group/voronoiBoost/tree/main/coverage-in-the-wild) folder.
+**The dataset is available in the [coverage](https://github.com/nds-group/voronoiBoost/tree/main/coverage) folder.**
 
 
 | Ground Truth                             | Voronoi                                    | VoronoiBoost                             |
