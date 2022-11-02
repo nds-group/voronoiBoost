@@ -51,7 +51,7 @@ df_bs.head(2)
 The output is a pandas dataframe with the following columns:
 ``lon``, ``lat``, ``voronoi`` (the legacy voronoi cell associated) & ``voronoi_boost`` (the scaled voronoi cells for different probabilities).
 
-![alt text](images/VoronoiBoost_Output_Dataframe.png)
+<img src="images/VoronoiBoost_Output_Dataframe.png" alt="VoronoiBoost output dataframe" max-width="85%"/>
 
 A full working example can be found in the ``VoronoiBoost_Example.ipynb`` file.
 
@@ -66,7 +66,7 @@ It is a [large-scale data set](https://github.com/nds-group/voronoiBoost/tree/ma
 
 For each base station in the data set, coverage is represented as a set of polygonal shapefiles, each associated with a given probability that end terminals associated to the base station are located within the polygon.
 
-![alt text](images/Dataset_Dataframe.png)
+<img src="images/Dataset_Dataframe.png" alt="Dataset Dataframe" max-width="100%"/>
 
 The data set substantially improves current practices for cellular coverage representation in large-scale studies, which primarily rely on plain Voronoi tessellations of the geographical space.
 As such, the data set can support data-driven networking research where coverage overlap or interference are key factors, as well as multidisciplinary investigations based on network metadata that needs to be mapped on the territory.
