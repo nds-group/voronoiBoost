@@ -20,32 +20,26 @@ Clone this repository and install the requirements:
 
 ```bash
 git clone https://github.com/nds-group/voronoiBoost.git
-
 pip install -r requirements.txt
 ```
 
 First is need to import the VoronoiBoost class from the voronoiBoost.py file:
 
 ```python
-import pandas as pd
-
-from shapely.geometry import shape as Shape
-from shapely.geometry import Polygon
-
 from voronoiBoost import VoronoiBoost
 ```
 
-**VoronoiBoost** use the same input as a standard voronoi tesselation, 
-* A set of points (base stations) 
-* a border area that defines the area of interest, i.e: City or Country boundaries
+VoronoiBoost use the same input as a standard voronoi tesselation, 
+* set of points, i.e: base stations locations
+* boundary of the area of interest, i.e: City or Country boundaries
 
-then, and instance can be lunch by provinding also the path to the trained model file.
+then, and instance can be lunch by provinding also the path to the trained Gradient Boost Regressor [model](https://github.com/nds-group/voronoiBoost/tree/main/model).
 
 ```python
 voronoiBoost = VoronoiBoost(sites, city_shape, model_path)
 
 df_bs = voronoiBoost.compute_voronoiBoost()
-df_bs.head(2)
+df_bs.head(5)
 ```
 
 The output is a pandas dataframe with the following columns:
@@ -73,3 +67,4 @@ As such, the data set can support data-driven networking research where coverage
 The following images show the legacy voronoi decomposition and the voronoiBoost decomposition for the same base stations. Other base stations are hidden for clarity.
 
 The data set is available in the [coverage](https://github.com/nds-group/voronoiBoost/tree/main/coverage) folder.
+The notebook [Coverage_in_the_Wild.ipynb](https://github.com/nds-group/voronoiBoost/blob/main/Coverage_in_the_Wild.ipynb) shows how to interact with the data set.
