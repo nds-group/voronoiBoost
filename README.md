@@ -73,7 +73,7 @@ The dataset is a collection of 40 (zip compress) pickle files encompassing four 
 * Orange
 * SFR
  
-and 10 french cities:
+and 10 French cities:
 
 * Bordeaux 
 * Lille 
